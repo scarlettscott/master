@@ -28,13 +28,23 @@ ind <- readr::read_delim(here::here("UK-NDNS-main/data", "tab", "ndns_rp_yr9-11a
 
 
 # 4) Getting average food consumption per person
-
+###OLD
 ndns2 <- ndns %>% mutate(across(c(24:81), as.numeric)) %>% 
   group_by(seriali, SurveyYear, DayNo, AgeR, Sex, Country,
            # DiaryDate, DayofWeek, DayNo, 
            FoodName, FoodNumber, SubFoodGroupCode,
            SubFoodGroupDesc, MainFoodGroupCode, MainFoodGroupDesc) %>% 
   summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE)))
+
+###NEW
+ndns2 <- ndns %>% mutate(across(c(24:81), as.numeric)) %>% 
+  group_by(seriali, SurveyYear, DayNo, AgeR, Sex, Country,
+           # DiaryDate, DayofWeek, DayNo, 
+           FoodName, FoodNumber, SubFoodGroupCode,
+           SubFoodGroupDesc, MainFoodGroupCode, MainFoodGroupDesc) %>% 
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE))) %>% 
+  mutate(across(where(is.numeric), ~ .x/4))
+
 
 
 # Checking main food groups supplying pro
@@ -45,6 +55,7 @@ ndns2 %>%
   geom_boxplot() + coord_flip()
 
 # 5) Getting average per food subgroup (top 60)
+
 ndns2 %>%
   group_by(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode,
            SubFoodGroupDesc) %>% 
@@ -58,6 +69,23 @@ ndns2 %>%
   arrange(desc(Proteing)) %>% ungroup() %>% slice_head(n=60) %>% 
   ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
   geom_boxplot() + coord_flip() 
+
+## NPD MATCHING
+
+NPD_AA <- ndns2 %>% filter(SubFoodGroupCode=='50E') %>% 
+  select(FoodName, FoodNumber, SubFoodGroupDesc, SubFoodGroupCode, 
+         MainFoodGroupDesc, MainFoodGroupCode, TotalGrams, Proteing) %>% 
+  ungroup() %>% 
+  group_by(FoodNumber, FoodName) %>% 
+  select(FoodName, TotalGrams, Proteing) %>% 
+  summarise(meanTotalGrams = mean(TotalGrams),
+            meanProteing = mean(Proteing)) %>% 
+  mutate(Protein_g1g = (meanProteing/meanTotalGrams)) %>% 
+  write.csv(here::here("data",
+                       "NPD_NDNS_protein_g1g.csv"))
+
+
+
 
 
 #Checking veg/vegan Y/N
