@@ -6,7 +6,6 @@ library("dplyr")
 library("ggplot2")
 options(scipen = 999) #Off the scientific notation
 
-
 # 0 Loading & preparing the data
 
 # Finding the files from NDNS for dietary data
@@ -26,15 +25,24 @@ ndns$TotalGrams <- as.numeric(ndns$TotalGrams)
 ind <- readr::read_delim(here::here("UK-NDNS-main/data", "tab", "ndns_rp_yr9-11a_indiv_20211020.tab"),
                          delim = "\t")
 
-
 # 4) Getting average food consumption per person
-
+###OLD
 ndns2 <- ndns %>% mutate(across(c(24:81), as.numeric)) %>% 
   group_by(seriali, SurveyYear, DayNo, AgeR, Sex, Country,
            # DiaryDate, DayofWeek, DayNo, 
            FoodName, FoodNumber, SubFoodGroupCode,
            SubFoodGroupDesc, MainFoodGroupCode, MainFoodGroupDesc) %>% 
   summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE)))
+
+###NEW
+ndns2 <- ndns %>% mutate(across(c(24:81), as.numeric)) %>% 
+  group_by(seriali, SurveyYear, DayNo, AgeR, Sex, Country,
+           # DiaryDate, DayofWeek, DayNo, 
+           FoodName, FoodNumber, SubFoodGroupCode,
+           SubFoodGroupDesc, MainFoodGroupCode, MainFoodGroupDesc) %>% 
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE))) %>% 
+  mutate(across(where(is.numeric), ~ .x/4))
+
 
 
 # Checking main food groups supplying pro
@@ -44,7 +52,8 @@ ndns2 %>%
   ggplot(aes(forcats::fct_reorder(MainFoodGroupDesc, Proteing), Proteing)) + 
   geom_boxplot() + coord_flip()
 
-# 5) Getting average per food subgroup (top 60)
+# 5) Getting average per food subgroup (top 60) (for matching)
+
 ndns2 %>%
   group_by(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode,
            SubFoodGroupDesc) %>% 
@@ -59,9 +68,82 @@ ndns2 %>%
   ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
   geom_boxplot() + coord_flip() 
 
+ndns2 %>% 
+  group_by(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode,
+           SubFoodGroupDesc) %>% 
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE))) %>% 
+  #  group_by(MainFoodGroupCode, MainFoodGroupDesc) %>% 
+  group_by(MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, SubFoodGroupDesc) %>% 
+  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) %>% 
+  select(MainFoodGroupCode, MainFoodGroupDesc,
+         SubFoodGroupCode, SubFoodGroupDesc,
+         TotalGrams, Proteing) %>% 
+  arrange(desc(Proteing)) %>% ungroup() %>% slice_head(n=60) %>% View()
 
-#Checking veg/vegan Y/N
-ind$Veg <- as.character(ind$Veg)
+
+# 6) Getting NPD consumption for matching
+
+## NPD MATCHING
+
+NPD_AA <- ndns2 %>% filter(SubFoodGroupCode=='50E') %>%
+  select(FoodName, FoodNumber, SubFoodGroupDesc, SubFoodGroupCode, 
+         MainFoodGroupDesc, MainFoodGroupCode, TotalGrams, Proteing, Waterg) %>% 
+  ungroup() %>% 
+  mutate(dry_weight = (TotalGrams - Waterg)) %>% 
+  mutate(Protein_g1g = (Proteing/dry_weight))
+
+#Load matched data 
+
+NPD_AA_match <- read.csv("NPD_matching.csv")
+View(NPD_AA_match)
+
+ndns2 %>% ungroup() %>% filter(FoodName=='PECTIN (DRY MIX)') %>%
+  select(seriali, TotalGrams, Proteing) %>% View()
+#never more than 0.5g total
+
+ndns2 %>% ungroup() %>% filter(FoodName=='BELEAN HIGH PROTEIN SHAKE') %>%
+  select(seriali, TotalGrams, Proteing) %>% View()
+# one person, once. 50g total, 3.6g protein
+
+
+library(tidyr)
+#Screen out low ranking items
+#Reasoning: 
+# Pectin - never more that 0.5g total. 
+# BELEAN = one person had once. 50g total, 3.6g protein. No protein type info. 
+# Fybogel = not protein
+NPD_AA_match <- NPD_AA_match %>% 
+  select(-X) %>%
+  drop_na()
+  
+#Match NPD AA info to NDNS consumption
+# Converting variables into character
+NPD_AA_match$FoodNumber <- as.character(NPD_AA_match$FoodNumber)
+
+NPD_AA_match <- NPD_AA_match %>% select(-FoodName)
+
+NPD_AA <- NPD_AA %>% 
+  left_join(NPD_AA_match, by = "FoodNumber")
+
+View(NPD_AA)  
+
+#Calculate true AA composition of NPDs consumed
+#Multiply all AA (g1g) by the dry weight Protein_g1g for each intake
+
+NPD_AA <- NPD_AA %>% 
+  mutate(Leucineg = (Protein_g1g * Leucine_g1g),
+         Isoleucineg = (Protein_g1g * Isoleucine_g1g),
+         Valineg = (Protein_g1g * Valine_g1g),
+         Lysineg = (Protein_g1g * Lysine_g1g),
+         Methionineg = (Protein_g1g * Methionine_g1g),
+         Histidineg = (Protein_g1g * Histidine_g1g),
+         Phenylalanineg = (Protein_g1g * Phenylalanine_g1g),
+         Threonineg = (Protein_g1g * Threonine_g1g))
+
+ 
+
+
+
 
 
 #Preparing ind for merging with ndns2:
