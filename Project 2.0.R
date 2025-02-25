@@ -44,7 +44,6 @@ ndns2 <- ndns %>% mutate(across(c(24:81), as.numeric)) %>%
   mutate(across(where(is.numeric), ~ .x/4))
 
 
-
 # Checking main food groups supplying pro
 
 ndns2 %>% 
@@ -52,8 +51,57 @@ ndns2 %>%
   ggplot(aes(forcats::fct_reorder(MainFoodGroupDesc, Proteing), Proteing)) + 
   geom_boxplot() + coord_flip()
 
-# 5) Getting average per food subgroup (top 60) (for matching)
 
+# 5) Getting average consumption per person per food subgroup (top 60) (for matching)
+
+#### NEW - CHECK
+ndns2 %>% #average food consumption per person per day
+  select(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+    #group by person, food groups
+  group_by(seriali, SubFoodGroupCode, SubFoodGroupDesc) %>% 
+    #sum per SFG for each individual
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+    #group by SFG 
+  group_by(SubFoodGroupDesc, SubFoodGroupCode) %>% 
+    #summarise to get median protein per group 
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+    #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+    #select top 60
+  slice_head(n=60)  %>%
+    #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() +
+  scale_y_continuous(breaks = seq(0, max(ndns2$Proteing), by = 1)) + 
+  labs(title = 'Average consumption per person per SFG',
+       x = 'SFG',
+       y = 'Proteing')
+
+  
+
+
+ndns2 %>% 
+  # Group by food groups
+  group_by(SubFoodGroupCode, SubFoodGroupDesc) %>% 
+  # Summarise to get median protein per group (skewed distribution?)
+  summarise(AvgProtein = median(Proteing, na.rm = TRUE), .groups = 'drop') %>% 
+  # Arrange by protein supply
+  arrange(desc(AvgProtein)) %>% View()
+  # Select top 60
+  slice_head(n = 60)  %>%
+  # Plot using ggplot
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, AvgProtein), AvgProtein)) + 
+  geom_boxplot() + 
+  coord_flip()
+
+
+
+#select variables of interest
+select(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, SubFoodGroupDesc, 
+       FoodName, FoodNumber, TotalGrams, Proteing) %>% 
+############
+#OLD
 ndns2 %>%
   group_by(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode,
            SubFoodGroupDesc) %>% 
@@ -68,6 +116,7 @@ ndns2 %>%
   ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
   geom_boxplot() + coord_flip() 
 
+#OLD
 ndns2 %>% 
   group_by(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode,
            SubFoodGroupDesc) %>% 
@@ -79,7 +128,7 @@ ndns2 %>%
          SubFoodGroupCode, SubFoodGroupDesc,
          TotalGrams, Proteing) %>% 
   arrange(desc(Proteing)) %>% ungroup() %>% slice_head(n=60) %>% View()
-
+################
 
 # 6) Getting NPD consumption for matching
 
@@ -140,10 +189,9 @@ NPD_AA <- NPD_AA %>%
          Phenylalanineg = (Protein_g1g * Phenylalanine_g1g),
          Threonineg = (Protein_g1g * Threonine_g1g))
 
- 
 
 
-
+###########################################################
 
 
 #Preparing ind for merging with ndns2:
@@ -342,11 +390,63 @@ demographics <- DietGrp_summary %>%
 write.csv(here::here("data", 
                      "demographics.csv"))
 
+#########################
 # 10) 
 #View top 60 food groups supplying protein to pop 
+## NEW
+ndns4 %>% #average food consumption per person per day
+  select(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #group by person, food groups
+  group_by(seriali, SubFoodGroupCode, SubFoodGroupDesc) %>% 
+  #sum per SFG for each individual
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #group by SFG 
+  group_by(SubFoodGroupDesc, SubFoodGroupCode) %>% 
+  #summarise to get median protein per group 
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=60)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,10) +
+  scale_y_continuous(breaks = seq(0, max(ndns2$Proteing), by = 1)) + 
+  labs(title = 'Average daily consumtpion of top 60 food groups supplying protein to UK population',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Pop_SFG_pro_CHECK.jpg")
+
+
+#OLD
 ndns4 %>% 
+  #group by food groups
+  group_by(SubFoodGroupCode,
+           SubFoodGroupDesc) %>% 
+  #summarise to get median protein per group (skewed distribution?)
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>%
+  #select variables of interest
+  select(SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=60)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,6) +
+  labs(title = 'Top 60 Food Groups Supplying Protein to UK Population',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+#OLD
+ndns4 %>% 
+  #group_by(seriali, FoodName, FoodNumber, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, SubFoodGroupDesc)
   group_by(seriali, FoodName, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode,
-           SubFoodGroupDesc, Overall_Diet) %>% 
+           SubFoodGroupDesc) %>% 
+  #summarise(?)
   summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE))) %>% 
   group_by(MainFoodGroupCode, MainFoodGroupDesc,
            SubFoodGroupCode, SubFoodGroupDesc) %>% 
@@ -358,16 +458,96 @@ ndns4 %>%
   # ggplot FoodName, Proteing to obtain top 20 foods providing protein to Vegans
   ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
   geom_boxplot() + coord_flip() + ylim(0, 45 ) +
-  labs(title = 'Top 20 Food Groups Supplying Protein to UK Population',
+  labs(title = 'Top 60 Food Groups Supplying Protein to UK Population',
        x = 'Food Groups',
        y = 'Average Protein (g)')
 
 ggsave(filename= "Plots/New Plots/Pop_SFG_av_pro.png")
 
-
+####################
 # 11)
 # View top 20 food groups supplying protein to each dietary group
 #Vegan
+
+#NEW VERSION 25/02
+ndns4 %>% #average food consumption per person per day
+  filter(Overall_Diet=='Vegan') %>% 
+  select(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #group by person, food groups
+  group_by(seriali, SubFoodGroupCode, SubFoodGroupDesc) %>% 
+  #sum per SFG for each individual
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #group by SFG 
+  group_by(SubFoodGroupDesc, SubFoodGroupCode) %>% 
+  #summarise to get median protein per group 
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,10) +
+  scale_y_continuous(breaks = seq(0, max(ndns2$Proteing), by = 1)) + 
+  labs(title = 'Average daily consumtpion of top 20 food groups supplying protein to Vegans',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Vegan_SFG_pro_CHECK.jpg")
+
+#NEW VERSION 25/02 EXCLUDE INFANTS UNDER 5?
+ndns4 %>% #average food consumption per person per day
+  filter(Overall_Diet=='Vegan') %>% 
+  filter(AgeR > 5) %>% 
+  select(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #group by person, food groups
+  group_by(seriali, SubFoodGroupCode, SubFoodGroupDesc) %>% 
+  #sum per SFG for each individual
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #group by SFG 
+  group_by(SubFoodGroupDesc, SubFoodGroupCode) %>% 
+  #summarise to get median protein per group 
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,10) +
+  scale_y_continuous(breaks = seq(0, max(ndns2$Proteing), by = 1)) + 
+  labs(title = 'Average daily consumtpion of top 20 food groups supplying protein to Vegans',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Vegan_SFG_pro_CHECK.jpg")
+
+
+#Version without grouping by seriali
+ndns4 %>% filter(Overall_Diet=='Vegan') %>% 
+  #group by food groups
+  group_by(SubFoodGroupCode,
+           SubFoodGroupDesc) %>% 
+  #summarise to get median protein per group (skewed distribution?)
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>%
+  #select variables of interest
+  select(SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,6) +
+  labs(title = 'Top 20 Food Groups Supplying Protein to UK Vegan Population',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Vegan_SFG_pro.jpg")
+
 # OLD VERSION
 ndns4 %>% filter(Overall_Diet=='Vegan') %>% 
   #  group_by(seriali, MainFoodGroupCode, MainFoodGroupDesc) %>% 
@@ -385,7 +565,7 @@ ndns4 %>% filter(Overall_Diet=='Vegan') %>%
 ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
   geom_boxplot() + coord_flip()
 
-# NEW VERSION
+
 ndns4 %>% filter(Overall_Diet=='Vegan') %>% 
   group_by(seriali, FoodName, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode,
            SubFoodGroupDesc, Overall_Diet) %>% 
@@ -407,8 +587,60 @@ ndns4 %>% filter(Overall_Diet=='Vegan') %>%
 ggsave(filename= "Plots/New Plots/Vegan_SFG_av_pro.png")
 
 
-
+######################
 #Vegetarian
+#NEW VERSION 25/02
+ndns4 %>% #average food consumption per person per day
+  filter(Overall_Diet=='Vegetarian') %>% 
+  filter(AgeR > 5) %>%
+  select(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #group by person, food groups
+  group_by(seriali, SubFoodGroupCode, SubFoodGroupDesc) %>% 
+  #sum per SFG for each individual
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #group by SFG 
+  group_by(SubFoodGroupDesc, SubFoodGroupCode) %>% 
+  #summarise to get median protein per group 
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,10) +
+  scale_y_continuous(breaks = seq(0, max(ndns2$Proteing), by = 1)) + 
+  labs(title = 'Average daily consumtpion of top 20 food groups supplying protein to Vegetarians',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Vegetarian_SFG_pro_CHECK.jpg")
+
+#NEW VERSION 
+ndns4 %>% filter(Overall_Diet=='Vegetarian') %>% 
+  #group by food groups
+  group_by(SubFoodGroupCode,
+           SubFoodGroupDesc) %>% 
+  #summarise to get median protein per group (skewed distribution?)
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>%
+  #select variables of interest
+  select(SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,6) +
+  labs(title = 'Top 20 Food Groups Supplying Protein to UK Vegetarian Population',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Veg_SFG_pro.jpg")
+
+
 # OLD VERSION
 ndns4 %>% filter(Overall_Diet=='Vegetarian') %>%
   #  group_by(seriali, MainFoodGroupCode, MainFoodGroupDesc) %>% 
@@ -475,8 +707,61 @@ ndns4 %>% filter(Overall_Diet=='Vegetarian') %>%
   geom_boxplot() + coord_flip()
 
 
-
+###########
 #Pescatarian
+#NEW VERSION 25/02 EXCLUDE INFANTS
+ndns4 %>% #average food consumption per person per day
+  filter(Overall_Diet=='Pescatarian') %>% 
+  filter(AgeR > 5) %>%
+  select(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #group by person, food groups
+  group_by(seriali, SubFoodGroupCode, SubFoodGroupDesc) %>% 
+  #sum per SFG for each individual
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #group by SFG 
+  group_by(SubFoodGroupDesc, SubFoodGroupCode) %>% 
+  #summarise to get median protein per group 
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,10) +
+  scale_y_continuous(breaks = seq(0, max(ndns2$Proteing), by = 1)) + 
+  labs(title = 'Average daily consumtpion of top 20 food groups supplying protein to Pescatarians',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Pescatarians_SFG_pro_CHECK.jpg")
+
+
+#NEW VERSION 
+ndns4 %>% filter(Overall_Diet=='Pescatarian') %>% 
+  #group by food groups
+  group_by(SubFoodGroupCode,
+           SubFoodGroupDesc) %>% 
+  #summarise to get median protein per group (skewed distribution?)
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>%
+  #select variables of interest
+  select(SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,6) +
+  labs(title = 'Top 20 Food Groups Supplying Protein to UK Pescatarian Population',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Pesc_SFG_pro.jpg")
+
+
 # OLD VERSION
 ndns4 %>% filter(Overall_Diet=='Pescatarian') %>% 
   #  group_by(seriali, MainFoodGroupCode, MainFoodGroupDesc) %>% 
@@ -517,8 +802,61 @@ ndns4 %>% filter(Overall_Diet=='Pescatarian') %>%
 ggsave(filename= "Plots/New Plots/Pescatarian_SFG_av_pro.png")
 
 
-
+############
 #Omnivore/Neither
+#NEW VERSION 25/02
+ndns4 %>% #average food consumption per person per day
+  filter(Overall_Diet=='Neither') %>% 
+  filter(AgeR > 5) %>%
+  select(seriali, MainFoodGroupCode, MainFoodGroupDesc, SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #group by person, food groups
+  group_by(seriali, SubFoodGroupCode, SubFoodGroupDesc) %>% 
+  #sum per SFG for each individual
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #group by SFG 
+  group_by(SubFoodGroupDesc, SubFoodGroupCode) %>% 
+  #summarise to get median protein per group 
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 60
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,10) +
+  scale_y_continuous(breaks = seq(0, max(ndns2$Proteing), by = 1)) + 
+  labs(title = 'Average daily consumtpion of top 20 food groups supplying protein to Omnivores',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Omni_SFG_pro_CHECK.jpg")
+
+
+#NEW VERSION 
+ndns4 %>% filter(Overall_Diet=='Neither') %>% 
+  #group by food groups
+  group_by(SubFoodGroupCode,
+           SubFoodGroupDesc) %>% 
+  #summarise to get median protein per group (skewed distribution?)
+  summarise(across(where(is.numeric), ~median(.x, na.rm = TRUE)), .groups = 'drop') %>%
+  #select variables of interest
+  select(SubFoodGroupCode, 
+         SubFoodGroupDesc, TotalGrams, Proteing) %>% 
+  #arrange by protein supply
+  arrange(desc(Proteing)) %>% ungroup() %>% 
+  #select top 20
+  slice_head(n=20)  %>%
+  #view in plot SFG, Protein
+  ggplot(aes(forcats::fct_reorder(SubFoodGroupDesc, Proteing), Proteing)) + 
+  geom_boxplot() + coord_flip() + ylim(0,6) +
+  labs(title = 'Top 20 Food Groups Supplying Protein to UK Omnivore Population',
+       x = 'Food Groups',
+       y = 'Average Protein (g)')
+
+ggsave(filename = "Plots/New Plots/Omni_SFG_pro.jpg")
+
+
 ndns4 %>% filter(Overall_Diet=='Neither') %>% 
   ###################################################
 ## POSSIBLE ADDITIONAL/UNNECESSARY SECTION
